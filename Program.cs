@@ -1,8 +1,92 @@
-﻿// See https://aka.ms/new-console-template for more information
- using System.IO;
- using System.Collections.Generic;
+﻿using System.IO;
+using System.Text;
+using System.Text.Json;
+using System.Globalization;
+using System.Collections.Generic;
 
+public class SalesSummaryReport
+{
+    private class SalesTotalData
+    {
+        public decimal OverallTotal { get; set; }
+    }
 
+    public static void ProcessSales(string storePath, string outputPath)
+    {
+        
+        decimal grandTotal = 0m;
+        
+        var salesDetails = new List<(string FileName, decimal Total)>();
+
+        // Fetch all "salestotals.json" files
+        IEnumerable<string> salesFiles = Directory.EnumerateFiles(
+            storePath, 
+            "salestotals.json", 
+            SearchOption.AllDirectories
+        );
+
+        foreach (var file in salesFiles)
+        {
+            try
+            {
+                string jsonContent = File.ReadAllText(file);
+                var salesData = JsonSerializer.Deserialize<SalesTotalData>(jsonContent);
+
+                if (salesData != null)
+                {
+                    decimal total = salesData.OverallTotal;
+                    
+                    // Accumulates the total
+                    grandTotal += total;
+                    
+                    salesDetails.Add((Path.GetFileName(file), total));
+                }
+            }
+            catch (Exception ex)
+            {
+                
+                Console.WriteLine($"Erro ao processar o arquivo {file}: {ex.Message}");
+            }
+        }
+
+        // Build the final report using StringBuilder
+        var report = new StringBuilder();
+        var culture = new CultureInfo("en-US");
+
+        report.AppendLine("Sales Summary Report");
+        report.AppendLine("--------------------------------------------------");
+        
+        
+        report.AppendLine($"Total Sales: {grandTotal.ToString("C2", culture)}"); 
+        report.AppendLine();
+        report.AppendLine("Details:");
+
+        foreach (var detail in salesDetails)
+        {
+            string totalStr = detail.Total.ToString("C2", culture);
+            
+            report.AppendLine($"  {detail.FileName.PadRight(30)}: {totalStr.PadLeft(15)}");
+        }
+        report.AppendLine("--------------------------------------------------");
+
+        File.WriteAllText(outputPath, report.ToString());
+    }
+}
+
+class Program
+{
+    static void Main(string[] args)
+    {
+        string baseDirectory = AppContext.BaseDirectory;
+        string projectRoot = Path.GetFullPath(Path.Combine(baseDirectory, @"..\..\..\"));
+        Directory.SetCurrentDirectory(projectRoot);
+        string baseDir = Directory.GetCurrentDirectory();
+        string storePath = Path.Combine(baseDir, "stores");
+        string outputPath = Path.Combine(baseDir, "sales_summary.txt");
+
+        SalesSummaryReport.ProcessSales(storePath, outputPath);
+    }
+}
 
 // string baseDirectory = AppContext.BaseDirectory;
 // string projectRoot = Path.GetFullPath(Path.Combine(baseDirectory, @"..\..\..\"));
